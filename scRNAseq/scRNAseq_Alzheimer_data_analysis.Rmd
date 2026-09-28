@@ -1,0 +1,1135 @@
+---
+title: "Alzheimer data analysis"
+output: html_document
+date: "2026-09-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Load libraries
+
+```{r warning=FALSE echo = FALSE}
+
+library(Seurat)
+library(monocle3)
+library(SeuratWrappers)
+library(harmony)
+
+library(UCell)
+library(AUCell)
+
+
+library(tidyr)
+library(dplyr)
+
+library(patchwork)
+library(ggplot2)
+library(RColorBrewer)
+
+
+library(pcaMethods)
+library(rstatix)
+library(SingleR)
+
+
+```
+
+
+
+
+
+
+
+# Load data
+
+<!-- Data description (Alzheimer) GSE175814 contains single-cell data from de cerveaux post-mortem de patients Alzheimer, avec plusieurs régions cérébrales. L'étude cherche notamment à caractériser les changements d'expression dans les neurones et cellules gliales --> 
+<!-- Single cell RNA sequencing analysis of human Alzheimer’s disease brain samples reveal neuronal and glial specific cells differential expression -->
+
+## Alzheimer Disease (AD)
+
+### Patient 1
+
+
+```{r}
+
+AD1.data <- Read10X(data.dir = "C:/Users/kembi/Documents/Users/Patricia_Kalombo/BIOINFORMATICS/scRNAseq/DATA/GSE175814_RAW/AD_Patient_1/")
+
+# Rename cells name
+colnames(x = AD1.data) <- paste('AD1', colnames(x = AD1.data), sep = '_')
+
+
+## Create Seurat object
+AD1_Patient_1 <- CreateSeuratObject(counts = AD1.data, project = "AD1")
+
+AD1_Patient_1
+
+```
+
+
+
+```{r}
+
+# Lets examine a few genes in the first thirty cells
+AD1.data[1:5, 1:30]
+
+```
+
+
+### Quality Control and Filter cells (remove cells of low quality): Remove cells with high number of mitochondrial genes & Remove cells with anormally high number of genes
+
+```{r}
+
+## Percentage of mito genes and store in "percent.mt" column
+AD1_Patient_1[["percent.mt"]] <- PercentageFeatureSet(AD1_Patient_1, pattern = "^MT-")
+
+head(AD1_Patient_1@meta.data, 5)
+
+```
+
+
+
+
+```{r warning=FALSE}
+
+FeatureScatter(object = AD1_Patient_1, feature1 = "nCount_RNA", feature2 = "percent.mt")
+FeatureScatter(object = AD1_Patient_1, feature1 = "nFeature_RNA", feature2 = "percent.mt")
+FeatureScatter(object = AD1_Patient_1, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+
+```
+
+
+
+```{r}
+
+# Filter low quality cells
+AD1_Patient_1 <- subset(x = AD1_Patient_1, subset = percent.mt < 10)
+
+AD1_Patient_1
+
+```
+
+
+
+```{r}
+
+## Check ater filtering
+FeatureScatter(object = AD1_Patient_1, feature1 = "nFeature_RNA", feature2 = "percent.mt")
+
+```
+
+
+
+```{r}
+
+AD1_Patient_1
+#33538 features across 6201 samples within 1 assay 
+
+
+```
+
+
+
+### Patient 2
+
+```{r}
+
+AD2.data <- Read10X(data.dir = "C:/Users/kembi/Documents/Users/Patricia_Kalombo/BIOINFORMATICS/scRNAseq/DATA/GSE175814_RAW/AD_Patient_2/")
+
+# Rename cells name
+colnames(x = AD2.data) <- paste('AD2', colnames(x = AD2.data), sep = '_')
+
+
+## Create Seurat object
+AD2_Patient_2 <- CreateSeuratObject(counts = AD2.data, project = "AD2")
+
+AD2_Patient_2
+
+```
+
+
+
+```{r}
+
+# Lets examine a few genes in the first thirty cells
+AD2.data[1:5, 1:30]
+
+```
+
+
+### Quality Control and Filter cells (remove cells of low quality): Remove cells with high number of mitochondrial genes & Remove cells with anormally high number of genes
+
+
+
+```{r}
+
+## Percentage of mito genes and store in "percent.mt" column
+AD2_Patient_2[["percent.mt"]] <- PercentageFeatureSet(AD2_Patient_2, pattern = "^MT-")
+
+head(AD2_Patient_2@meta.data, 5)
+
+```
+
+
+
+
+```{r warning=FALSE}
+
+FeatureScatter(object = AD2_Patient_2, feature1 = "nCount_RNA", feature2 = "percent.mt")
+FeatureScatter(object = AD2_Patient_2, feature1 = "nFeature_RNA", feature2 = "percent.mt")
+FeatureScatter(object = AD2_Patient_2, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+
+```
+
+
+
+```{r}
+
+## Filter low quality cells
+AD2_Patient_2 <- subset(x = AD2_Patient_2, subset = percent.mt < 20 & nFeature_RNA < 8000)
+AD2_Patient_2
+
+```
+
+
+
+```{r}
+
+## Check ater filtering
+FeatureScatter(object = AD2_Patient_2, feature1 = "nFeature_RNA", feature2 = "percent.mt")
+
+```
+
+
+
+```{r}
+
+AD2_Patient_2
+#33538 features across 5187 samples within 1 assay 
+
+```
+
+
+
+## Healthy Donor (HD)
+
+### Patient 1
+
+
+```{r}
+
+HD1.data <- Read10X(data.dir = "C:/Users/kembi/Documents/Users/Patricia_Kalombo/BIOINFORMATICS/scRNAseq/DATA/GSE175814_RAW/HD_Patient_1/")
+
+# Rename cells name
+colnames(x = HD1.data) <- paste('HD1', colnames(x = HD1.data), sep = '_')
+
+
+## Create Seurat object
+HD1_Patient_1 <- CreateSeuratObject(counts = HD1.data, project = "HD1")
+
+HD1_Patient_1
+
+```
+
+
+
+
+```{r}
+
+# Lets examine a few genes in the first thirty cells
+HD1.data[1:5, 1:30]
+
+```
+
+
+
+
+### Quality Control and Filter cells (remove cells of low quality): Remove cells with high number of mitochondrial genes & Remove cells with anormally high number of genes
+
+```{r}
+
+## Percentage of mito genes and store in "percent.mt" column
+HD1_Patient_1[["percent.mt"]] <- PercentageFeatureSet(HD1_Patient_1, pattern = "^MT-")
+
+head(HD1_Patient_1@meta.data, 5)
+
+```
+
+
+
+
+
+```{r warning=FALSE}
+
+FeatureScatter(object = HD1_Patient_1, feature1 = "nCount_RNA", feature2 = "percent.mt")
+FeatureScatter(object = HD1_Patient_1, feature1 = "nFeature_RNA", feature2 = "percent.mt")
+FeatureScatter(object = HD1_Patient_1, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+
+```
+
+
+
+
+```{r}
+
+## Filter low quality cells
+
+HD1_Patient_1 <- subset(x = HD1_Patient_1, subset = percent.mt < 20 & nFeature_RNA < 8000)
+
+HD1_Patient_1
+
+```
+
+
+
+
+```{r}
+
+## Check ater filtering
+
+FeatureScatter(object = HD1_Patient_1, feature1 = "nFeature_RNA", feature2 = "percent.mt")
+
+```
+
+
+
+
+```{r}
+
+HD1_Patient_1
+#33538 features across 5971 samples within 1 assay 
+
+```
+
+### Patient 2
+
+
+```{r}
+
+HD2.data <- Read10X(data.dir = "C:/Users/kembi/Documents/Users/Patricia_Kalombo/BIOINFORMATICS/scRNAseq/DATA/GSE175814_RAW/HD_Patient_2/")
+
+# Rename cells name
+colnames(x = HD2.data) <- paste('HD2', colnames(x = HD2.data), sep = '_')
+
+
+## Create Seurat object
+HD2_Patient_2 <- CreateSeuratObject(counts = HD2.data, project = "HD2")
+
+HD2_Patient_2
+
+```
+
+
+
+
+```{r}
+
+# Lets examine a few genes in the first thirty cells
+HD2.data[1:5, 1:30]
+
+```
+
+
+
+
+### Quality Control and Filter cells (remove cells of low quality): Remove cells with high number of mitochondrial genes & Remove cells with anormally high number of genes
+
+```{r}
+
+## Percentage of mito genes and store in "percent.mt" column
+HD2_Patient_2[["percent.mt"]] <- PercentageFeatureSet(HD2_Patient_2, pattern = "^MT-")
+
+head(HD2_Patient_2@meta.data, 5)
+
+```
+
+
+
+
+
+```{r warning=FALSE}
+
+FeatureScatter(object = HD2_Patient_2, feature1 = "nCount_RNA", feature2 = "percent.mt")
+FeatureScatter(object = HD2_Patient_2, feature1 = "nFeature_RNA", feature2 = "percent.mt")
+FeatureScatter(object = HD2_Patient_2, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+
+```
+
+
+
+
+```{r}
+
+## Filter low quality cells
+HD2_Patient_2 <- subset(x = HD2_Patient_2, subset = percent.mt < 10 & nFeature_RNA < 10800)
+
+HD2_Patient_2
+
+```
+
+
+
+
+```{r}
+
+## Check ater filtering
+FeatureScatter(object = HD2_Patient_2, feature1 = "nFeature_RNA", feature2 = "percent.mt")
+
+```
+
+
+
+```{r}
+
+HD2_Patient_2
+#33538 features across 10924 samples within 1 assay 
+
+```
+
+
+
+
+# Merge datasets (seurat object)
+
+```{r}
+
+merged_seurat_data <- merge(AD1_Patient_1,
+                            y = list(AD2_Patient_2, HD1_Patient_1, HD2_Patient_2),
+                            project = "Merged_AD_1_2_HD_1_2")
+
+# merged_seurat_data <- merge(AD1_Patient_1, y = HD1_Patient_1, 
+#                             project = "Merged_AD_1_HD_1")
+merged_seurat_data
+
+```
+
+
+```{r}
+
+merged_seurat_data$Samples <- rownames(merged_seurat_data@meta.data)
+
+merged_seurat_data@meta.data <- separate(merged_seurat_data@meta.data, col = 'Samples', into = c('Patient', 'Barcode'), sep = '_')
+
+merged_seurat_data@meta.data$Patient_Condition <- "Healthy"
+
+
+merged_seurat_data@meta.data$Patient_Condition[merged_seurat_data@meta.data$Patient %in% c("AD1", "AD2")] <- "Alzheimer"
+
+# View(merged_seurat_data@meta.data)
+
+```
+
+
+
+## Check quality control on merged dataset
+
+```{r}
+
+FeatureScatter(object = merged_seurat_data, feature1 = "nFeature_RNA", feature2 = "percent.mt")
+
+```
+
+
+
+```{r}
+
+merged_seurat_data
+#33538 features across 28283 samples within 1 assay
+
+```
+
+
+
+
+
+# Data integration
+
+## CCA methods
+
+### Preprocess data without integration
+
+
+```{r warning=FALSE}
+
+## Normalize and Transform data & Find fatures highly variables
+merged_seurat_data_integration <- SCTransform(object = merged_seurat_data)
+
+## PCA
+merged_seurat_data_integration <- RunPCA(merged_seurat_data_integration)
+## Help to choose number of components
+ElbowPlot(merged_seurat_data_integration)
+
+
+merged_seurat_data_integration <- FindNeighbors(merged_seurat_data_integration, dims = 1:20, reduction = "pca", verbose = FALSE)
+merged_seurat_filtered <- FindClusters(merged_seurat_data_integration)
+
+merged_seurat_data_integration <- RunUMAP(merged_seurat_data_integration, dims = 1:20, reduction.name = "UMAP_unintegrated")
+
+
+DimPlot(merged_seurat_data_integration, reduction = "UMAP_unintegrated", label = TRUE)
+
+DimPlot(merged_seurat_data_integration, reduction = "UMAP_unintegrated", group.by = "Patient")
+
+
+```
+
+### Perform integration with CCA methods
+
+
+```{r}
+
+merged_seurat_data_integration <- IntegrateLayers(object = merged_seurat_data_integration, method = CCAIntegration, normalization.method = "SCT", verbose = F)
+
+merged_seurat_data_integration <- FindNeighbors(merged_seurat_data_integration, reduction = "integrated.dr", dims = 1:20)
+
+merged_seurat_data_integration <- FindClusters(merged_seurat_data_integration, resolution = 0.05)
+
+
+merged_seurat_data_integration <- RunUMAP(merged_seurat_data_integration, dims = 1:20, reduction = "integrated.dr", reduction.name = "UMAP_integrated")
+
+
+## Vizualisation
+DimPlot(merged_seurat_data_integration, reduction = "UMAP_integrated", group.by = c("Patient")) + ggtitle("AD_HD")
+
+DimPlot(merged_seurat_data_integration, reduction = "UMAP_integrated", label = TRUE)
+
+
+DimPlot(merged_seurat_data_integration, reduction = "UMAP_integrated", group.by = c("Patient", "seurat_clusters"))
+
+
+
+DimPlot(merged_seurat_data_integration, reduction = "UMAP_integrated", split.by = "Patient", label = TRUE) + ggtitle("Alzheimer") + theme(plot.title = element_text(hjust = 0.5))  + labs(x ="UMAP_1", y = "UMAP_2")
+
+# p_umap <- DimPlot(merged_seurat_integration, reduction = "UMAP_integrated", split.by = "Patient", label = TRUE) + ggtitle("Alzheimer") + theme(plot.title = element_text(hjust = 0.5))  + labs(x ="UMAP_1", y = "UMAP_2")
+
+# ggsave(p_umap,file = "C:/Users/kembi/Documents/Users/Patricia_Kalombo/CRCT/TUTORIAL/GSEA/Sabatier2023/RESULTS/scRNAseq/PDX_TUH110/UMAP_Alzheimer.pdf", device = "pdf", width = 7, height = 5)
+
+
+
+```
+
+
+```{r}
+
+
+## Vizualisation
+
+
+# p_umap <- DimPlot(merged_seurat_integration, reduction = "UMAP_integrated", label = TRUE) + ggtitle("Alzheimer Disease") + theme(plot.title = element_text(hjust = 0.5))  + labs(x ="UMAP_1", y = "UMAP_2")
+
+# p_umap <- DimPlot(merged_seurat_integration, reduction = "UMAP_integrated", label = TRUE) + ggtitle("") + theme(plot.title = element_text(hjust = 0.5))  + labs(x ="UMAP_1", y = "UMAP_2")
+
+p_umap <- DimPlot(merged_seurat_integration, reduction = "UMAP_integrated", label = TRUE) + NoLegend() + NoAxes() #ggtitle("") + theme(plot.title = element_text(hjust = 0.5))  + labs(x ="UMAP_1", y = "UMAP_2")
+# 
+# p_umap <- DimPlot(merged_seurat_integration, reduction = "UMAP_integrated", split.by = "Patient", label = TRUE) + ggtitle("PDX_TUH110_GILT_D7") + theme(plot.title = element_text(hjust = 0.5))  + labs(x ="UMAP_1", y = "UMAP_2")
+
+ggsave(p_umap,file = "C:/Users/kembi/Documents/Users/Patricia_Kalombo/BIOINFORMATICS/scRNAseq/RESULTS/alzheimer_disease_2AD_2HD.jpeg", width = 7, height = 5, dpi = 300)
+
+# ggsave("mon_plot.jpeg", plot = p, width = 8, height = 6)
+
+```
+
+
+
+### Save seurat object
+
+```{r}
+
+## save results of integration with CCA methods
+# saveRDS(merged_seurat_integration, file = "C:/Users/kembi/Documents/Users/Patricia_Kalombo//merged_seurat_integration_005.rds")
+
+```
+
+
+
+### Read RDS seurat object
+
+```{r}
+
+# merged_seurat_integration <- readRDS("C:/Users/kembi/Documents/Users/Patricia_Kalombo/merged_seurat_integration_005.rds")
+
+```
+
+
+
+
+# Cell type annotation using genes markers
+
+```{r}
+
+##List of genes markers for annotations
+markers_neuro <- list(
+  # Microglia
+  Microglia = c("P2RY12", "TMEM119","CX3CR1", "AIF1", "C1QA",
+                "C1QB", "C1QC", "SALL1", "TYROBP", "LST1"),
+
+  # Microglia activated / DAM
+  Microglia_DAM = c("APOE", "TREM2", "GPNMB", "SPP1", "CST7",
+                    "LPL", "LGALS3", "CLEC7A"),
+
+  # Astrocytes
+  Astrocytes = c("GFAP", "AQP4", "ALDH1L1", "SLC1A3",
+                 "S100B",  "SOX9", "FABP7"),
+
+  # Reactive astrocytes
+  Astrocytes_reactive = c("GFAP", "VIM", "C3",
+                          "SERPINA3", "LCN2", "CLU"),
+
+  # Oligodendrocytes
+  Oligodendrocytes = c("MBP", "PLP1",  "MOG",  "MAG",
+                       "MOBP", "CLDN11",  "OPALIN"),
+
+  # OPC
+  OPC = c("PDGFRA", "CSPG4", "OLIG1", "OLIG2","SOX10" ),
+
+  # Excitatory neurons
+  Excitatory_neurons = c("SLC17A7", "SLC17A6", "CAMK2A", "SATB2","TBR1"),
+
+  # Inhibitory neurons
+  Inhibitory_neurons = c("GAD1", "GAD2", "SLC32A1","DLX1", "DLX2"),
+
+  # PVALB interneurons
+  PVALB = c("PVALB", "GAD1", "GAD2" ),
+
+  # SST interneurons
+  SST = c("SST", "GAD1", "GAD2"),
+
+  # VIP interneurons
+  VIP = c("VIP", "GAD1","GAD2"),
+
+  # Endothelial
+  Endothelial = c("CLDN5", "PECAM1", "VWF", "KDR", "EMCN", "RAMP2"),
+
+  # Pericytes
+  Pericytes = c("PDGFRB", "RGS5", "CSPG4", "MCAM", "DES"),
+
+  # Ependymal
+  Ependymal = c( "FOXJ1", "PIFO", "TPPP3", "RSPH1" )
+)
+
+
+## Keep only genes that are in normalized matrix
+markers_neuro <- lapply(markers_neuro, function(x) {
+  intersect(x, rownames(merged_seurat_data_integration))
+})
+
+
+
+```
+
+
+
+```{r}
+
+
+markers_neuro <- list(
+  # Microglia
+  Microglia = c("P2RY12", "TMEM119","CX3CR1", "AIF1", "C1QA",
+                "C1QB", "C1QC", "SALL1", "TYROBP", "LST1"),
+
+  # # Microglia activated / DAM
+  # Microglia_DAM = c("APOE", "TREM2", "GPNMB", "SPP1", "CST7",
+  #                   "LPL", "LGALS3", "CLEC7A"),
+
+  # Astrocytes
+  Astrocytes = c("GFAP", "AQP4", "ALDH1L1", "SLC1A3",
+                 "S100B",  "SOX9", "FABP7"),
+
+  # # Reactive astrocytes
+  # Astrocytes_reactive = c("GFAP", "VIM", "C3",
+  #                         "SERPINA3", "LCN2", "CLU"),
+
+  # Oligodendrocytes
+  Oligodendrocytes = c("MBP", "PLP1",  "MOG",  "MAG",
+                       "MOBP", "CLDN11",  "OPALIN"),
+
+  # OPC
+  OPC = c("PDGFRA", "CSPG4", "OLIG1", "OLIG2","SOX10" ),
+
+  # Excitatory neurons
+  Excitatory_neurons = c("SLC17A7", "SLC17A6", "CAMK2A", "SATB2","TBR1"),
+
+  # Inhibitory neurons
+  Inhibitory_neurons = c("GAD1", "GAD2", "SLC32A1","DLX1", "DLX2"),
+
+  # PVALB interneurons
+  # PVALB = c("PVALB", "GAD1", "GAD2" ),
+
+  # SST interneurons
+  # SST = c("SST", "GAD1", "GAD2"),
+
+  # VIP interneurons
+  # VIP = c("VIP", "GAD1","GAD2"),
+  
+  PVALB_SST_VIP = c("PVALB", "GAD1", "GAD2", "SST", "VIP" ),
+
+  # Endothelial
+  Endothelial = c("CLDN5", "PECAM1", "VWF", "KDR", "EMCN", "RAMP2"),
+
+  # Pericytes
+  Pericytes = c("PDGFRB", "RGS5", "CSPG4", "MCAM", "DES"),
+
+  # Ependymal
+  Ependymal = c( "FOXJ1", "PIFO", "TPPP3", "RSPH1" )
+)
+
+
+## Keep only genes that are in normalized matrix
+markers_neuro <- lapply(markers_neuro, function(x) {
+  intersect(x, rownames(merged_seurat_data_integration))
+})
+
+
+
+```
+
+
+
+## Compute score for each populations with AddModuleScore function
+
+```{r}
+
+merged_seurat_data_integration <- AddModuleScore(object = merged_seurat_data_integration,
+                                                 features = markers_neuro,
+                                                 name =  paste0(names(markers_neuro), "_score"),
+                                                 ctrl = 100,  nbin = 24, seed = 123)
+
+
+
+```
+
+
+```{r}
+
+DotPlot(
+  merged_seurat_data_integration,
+  features = c(
+    "Microglia_score1", "Microglia_DAM_score2", 
+    "Astrocytes_score3", "Astrocytes_reactive_score4",
+    "Oligodendrocytes_score5", "OPC_score6", 
+     "Excitatory_neurons_score7",
+    "Inhibitory_neurons_score8"
+  ),
+  group.by = "seurat_clusters"
+) +
+  RotatedAxis() +
+  theme(
+    axis.text.x = element_text(
+      angle = 45,
+      hjust = 1
+    )
+  )
+
+
+```
+
+
+
+```{r}
+
+score_cols <- grep("_score", colnames(merged_seurat_data_integration@meta.data), value = TRUE)
+
+
+# Do cell type annotation based on the high score for each cell
+merged_seurat_data_integration$Celltype <- apply(
+  merged_seurat_data_integration@meta.data[, score_cols],
+  1,
+  function(x) names(markers_neuro)[which.max(x)]
+)
+
+
+# UMAP by cell type annoted
+DimPlot(merged_seurat_data_integration, group.by = "Celltype", label = TRUE) + 
+  ggtitle("Cell type annotation using geneset markers") + NoLegend()
+
+DimPlot(merged_seurat_data_integration, group.by = "Celltype", label = TRUE) + 
+  ggtitle("Cell type annotation using geneset markers")
+
+
+```
+
+
+
+
+### Proportion of cells by condition for each cluster
+
+```{r}
+
+donnees <- merged_seurat_data_integration@meta.data[, c("Patient", "Celltype", "seurat_clusters")]
+
+donnees <- donnees %>%
+  group_by(seurat_clusters, Celltype) %>%  ## , Patient
+  summarise(Proportion = n())
+
+colnames(donnees) <- sub("Celltype","Cells_Pops", colnames(donnees))
+
+
+pClusters <- ggplot(donnees, aes( x=seurat_clusters, y=Proportion, fill=Cells_Pops)) +
+  geom_bar(position="fill", stat="identity") +
+  theme_classic() + labs(x = "Clusters", y = "Fraction of cells in each cluster") +
+  ggtitle("Cluster composition") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+# ggsave(pClusters,file = "C:/Users/kembi/Documents/Users/Patricia_Kalombo/BIOINFORMATICS/scRNAseq/RESULTS/alzheimer_disease_2AD_2HD_barplot.jpeg", width = 7, height = 5, dpi = 300)
+
+
+```
+
+
+
+```{r}
+
+# p_umap_cluster <- p_umap | pClusters
+# 
+# ggsave(p_umap_cluster,file = "C:/Users/kembi/Documents/Users/Patricia_Kalombo/BIOINFORMATICS/scRNAseq/RESULTS/alzheimer_disease_2AD_2HD_umap_barplot.jpeg", width = 9, height = 5, dpi = 300)
+
+```
+
+
+
+##  Gene Set Enrichment Analysis with CCA results (enrichment signature score)
+
+
+```{r}
+
+## INFLAMMATORY_SIGNATURES
+
+signature_genes <- list(INFLAMMATORY_SIGNATURES = 
+                          c("ABCA1","ABI1","ACVR1B","ACVR2A","ADM","ADORA2B","ADRM1","AHR",
+                        "APLNR","AQP9","ATP2A2","ATP2B1","ATP2C1","AXL","BDKRB1","BEST1",
+                        "BST2","BTG2","C3AR1","C5AR1","CALCRL","CCL17","CCL2","CCL20",
+                        "CCL22","CCL24","CCL5","CCL7","CCR7","CCRL2","CD14","CD40","CD48",
+                        "CD55","CD69","CD70","CD82","CDKN1A","CHST2","CLEC5A","CMKLR1",
+                        "CSF1","CSF3","CSF3R","CX3CL1","CXCL10","CXCL11","CXCL6","CXCL9",
+                        "CXCR6","CYBB","DCBLD2","EBI3","EDN1","EIF2AK2","EMP3","ADGRE1",
+                        "EREG","F3","FFAR2","FPR1","FZD5","GABBR1","GCH1","GNA15","GNAI3",
+                        "GP1BA","GPC3","GPR132","GPR183","HAS2","HBEGF","HIF1A","HPN",
+                        "HRH1","ICAM1","ICAM4","ICOSLG","IFITM1","IFNAR1","IFNGR2","IL10",
+                        "IL10RA","IL12B","IL15","IL15RA","IL18","IL18R1","IL18RAP","IL1A",
+                        "IL1B","IL1R1","IL2RB","IL4R","IL6","IL7R","CXCL8","INHBA","IRAK2",
+                        "IRF1","IRF7","ITGA5","ITGB3","ITGB8","KCNA3","KCNJ2","KCNMB2","KIF1B",
+                        "KLF6","LAMP3","LCK","LCP2","LDLR","LIF","LPAR1","LTA","LY6E","LYN",
+                        "MARCO","MEFV","MEP1A","MET","MMP14","MSR1","MXD1","MYC","NAMPT",
+                        "NDP","NFKB1","NFKBIA","NLRP3","NMI","NMUR1","NOD2","NPFFR2","OLR1",
+                        "OPRK1","OSM","OSMR","P2RX4","P2RX7","P2RY2","PCDH7","PDE4B","PDPN",
+                        "PIK3R5","PLAUR","PROK2","PSEN1","PTAFR","PTGER2","PTGER4","PTGIR",
+                        "PTPRE","PVR","RAF1","RASGRP1","RELA","RGS1","RGS16","RHOG","RIPK2",
+                        "RNF144B","ROS1","RTP4","SCARF1","SCN1B","SELE","SELL","SELENOS",
+                        "SEMA4D","SERPINE1","SGMS2","SLAMF1","SLC11A2","SLC1A2","SLC28A2",
+                        "SLC31A1","SLC31A2","SLC4A4","SLC7A1","SLC7A2","SPHK1","SRI","STAB1",
+                        "TACR1","TACR3","TAPBP","TIMP1","TLR1","TLR2","TLR3","TNFAIP6",
+                        "TNFRSF1B","TNFRSF9","TNFSF10","TNFSF15","TNFSF9","TPBG","VIP"))
+
+
+## Inflammatory  geneset signatures
+signature_genes <- list(c(signature_genes$INFLAMMATORY_SIGNATURES))
+
+## Keep only genes expressed in data
+signature_genes <- lapply(signature_genes, function(x) {
+  intersect(x, rownames(merged_seurat_data_integration))
+})
+
+signature_genes[which(sapply(signature_genes, length) == 0)] <- NULL
+
+
+merged_seurat_data_integration <- AddModuleScore(merged_seurat_data_integration, 
+                                                 features = signature_genes, 
+                                                 name = "INFLAMMATORY_SIGNATURES", 
+                                                 nbin =  20)
+
+
+
+# View(merged_seurat_data_integration@meta.data)
+
+
+
+```
+
+
+
+
+
+
+
+
+## Vizualisation
+
+### UMAP
+
+```{r}
+
+
+## Visualize score on UMAP
+
+## INFLAMMATORY_SIGNATURES
+FeaturePlot(merged_seurat_data_integration, features = "INFLAMMATORY_SIGNATURES1", label = TRUE, reduction = "UMAP_integrated",raster= FALSE,label.size = 6, repel = TRUE, cols = c("grey",   "red")) #+ scale_colour_gradientn(colours= rev(brewer.pal(n=11, name = "Spectral")))
+
+FeaturePlot(merged_seurat_data_integration, features = "INFLAMMATORY_SIGNATURES1", split.by = "Patient", label = TRUE, reduction = "UMAP_integrated", raster= FALSE,label.size = 6, repel = TRUE) #+ scale_colour_gradientn(colours= rev(brewer.pal(n=11, name = "Spectral")))
+
+
+
+```
+
+
+
+#### Which populations expressed interests Genes 
+
+
+```{r}
+
+FeaturePlot(merged_seurat_data_integration, features = c("APBB1IP", "ST18","SV2B"), label = TRUE, reduction = "UMAP_integrated", raster= FALSE,label.size = 5, repel = TRUE, cols = c("grey",   "red"))
+
+FeaturePlot(merged_seurat_data_integration, features = c("GRIK3", "PDGFRA"), label = TRUE, reduction = "UMAP_integrated", raster= FALSE,label.size = 5, repel = TRUE, cols = c("grey",   "red"))
+
+
+###, min.cutoff = -2, max.cutoff = 2 split.by = "Patient", 
+
+```
+
+
+
+
+# MONOCLE3 WORKFLOW
+
+
+```{r}
+
+# 1 Convert  seurat object to cell_data_set object for monocle3
+
+cds <- as.cell_data_set(merged_seurat_data_integration)
+cds
+
+
+```
+
+
+```{r}
+
+# to get cell metadata
+colData(cds)
+# to gene metdata
+fData(cds)
+rownames(fData(cds))[1:10]
+
+# since it misses the gene_short_name column, let's add it
+fData(cds)$gene_short_name <- rownames(fData(cds))
+
+# to get counts
+counts(cds)
+
+
+```
+
+
+## Cluster cells (using clustering info from seurat's UMAP)
+
+
+```{r}
+
+
+# 2. Cluster cells (using clustering info from seurat's UMAP)
+# let's use the clustering information have
+
+# 1. Assign paritions
+reacreate.partition <- c(rep(1,length(cds@colData@rownames)))
+names(reacreate.partition) <- cds@colData@rownames
+reacreate.partition <- as.factor(reacreate.partition)
+
+cds@clusters$UMAP$partitions <- reacreate.partition
+
+
+# 2. Assign the cluster info 
+list_cluster <- merged_seurat_data_integration@active.ident
+cds@clusters$UMAP$clusters <- list_cluster
+
+
+# Assign UMAP coordinate - cell embeddings
+cds@int_colData@listData$reducedDims$UMAP <- merged_seurat_data_integration@reductions$UMAP_integrated@cell.embeddings
+
+
+
+
+```
+
+
+
+
+
+```{r}
+
+
+# Plot
+
+cluster.before.trajectory <- plot_cells(cds,
+                                        color_cells_by = 'cluster',
+                                        label_groups_by_cluster = FALSE,
+                                        group_label_size = 5) +
+  theme(legend.position = "right")
+
+cluster.names <- plot_cells(cds,
+           color_cells_by = "Celltype",
+           label_groups_by_cluster = FALSE,
+           group_label_size = 5) +
+  # scale_color_manual(values = c('red', 'blue', 'green', 'maroon', 'yellow', 'grey', 'cyan')) +
+  theme(legend.position = "none")
+
+cluster.before.trajectory | cluster.names
+
+
+
+
+
+```
+
+
+### Trajectory analysis
+
+
+```{r}
+
+
+# 3. Learn trajectory graph
+cds <- learn_graph(cds, use_partition = FALSE)
+
+plot_cells(cds,
+           color_cells_by = 'Celltype',
+           label_groups_by_cluster = FALSE,
+           label_branch_points = FALSE,
+           label_roots = FALSE,
+           label_leaves = FALSE,
+           group_label_size = 5)
+
+
+
+```
+
+
+### Psuedotime: 4. Order the cells in pseudotime
+
+```{r}
+
+
+# 4. Order the cells in pseudotime
+
+cds <- order_cells(cds, reduction_method = 'UMAP', 
+                    root_cells = colnames(cds[,clusters(cds) == 1]))
+
+plot_cells(cds,
+           color_cells_by = 'pseudotime',
+           label_groups_by_cluster = FALSE,
+           label_branch_points = FALSE,
+           label_roots = FALSE,
+           label_leaves = FALSE)
+
+
+
+
+
+
+```
+
+```{r}
+
+# cells ordered by monocle3 pseudotime
+
+pseudotime(cds)
+cds$monocle3_pseudotime <- pseudotime(cds)
+data.pseudo <- as.data.frame(colData(cds))
+
+
+
+ggplot(data.pseudo, aes(monocle3_pseudotime, reorder(Celltype, monocle3_pseudotime, median), fill = Celltype)) +
+  geom_boxplot() 
+
+
+
+```
+
+
+
+
+## Finding differentially expressed features for all cluster
+
+```{r}
+
+merged_seurat_data_integration_markers <- PrepSCTFindMarkers(merged_seurat_data_integration)
+
+
+```
+
+
+
+```{r}
+
+
+
+library(future)
+
+plan("multicore", workers = 2)  # ou "multisession" sur Windows
+options(future.globals.maxSize = 3 * 1024^3)  # augmente la limite to 10 Go
+
+
+
+genesDEGs_clusters <- FindAllMarkers(merged_seurat_data_integration_markers,verbose = FALSE, only.pos = FALSE, logfc.threshold = 0) #, test.use = "DESeq2")
+
+
+genesDEGs_clusters <- data.frame(Genes =  rownames(genesDEGs_clusters),
+                           genesDEGs_clusters)
+
+
+genesDEGs_clusters %>%
+  group_by(cluster) %>%
+  arrange()
+
+```
+
+
+```{r}
+
+library(dplyr)
+
+top5_genes <- genesDEGs_clusters %>%
+  filter(avg_log2FC > 0) %>%              # uniquement les gènes upregulated
+  filter(p_val_adj < 0.05) %>%           # optionnel : significatifs
+  group_by(cluster) %>%
+  slice_max(
+    order_by = avg_log2FC,
+    n = 5,
+    with_ties = FALSE
+  ) %>%
+  ungroup()
+
+top5_genes
+
+
+
+```
+
+
+
+
+
+```{r}
+
+genes <- unique(top5_genes$gene)
+
+genes <- top5_genes %>%
+  arrange(cluster, desc(avg_log2FC)) %>%
+  pull(gene) %>%
+  unique()
+
+## DotPlot
+DotPlot(
+  object = merged_seurat_data_integration,
+  features = genes) +
+  RotatedAxis()
+
+
+```
+
+
+
+
